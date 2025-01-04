@@ -1,0 +1,6 @@
+node_modules
+.env
+*CHECKLIST.md
+*PROJECT*.md
+MongoDB model*.json
+dist
