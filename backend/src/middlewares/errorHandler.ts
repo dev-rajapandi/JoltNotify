@@ -3,7 +3,6 @@ import { ConflictError, ValidationError } from '../utils/errors';
 
 export const errorHandler = (
   err: Error,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   req: Request,
   res: Response,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
