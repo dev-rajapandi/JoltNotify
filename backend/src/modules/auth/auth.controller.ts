@@ -6,7 +6,7 @@ import { ValidationError } from '../../utils/errors';
 import { UserMapper } from '../../mappers/user.mapper';
 
 export const registerUserController = async (
-  req: Request<{}, {}, IRegisterPayload>,
+  req: Request<object, object, IRegisterPayload>,
   res: Response,
   next: NextFunction,
 ) => {

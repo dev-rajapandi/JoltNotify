@@ -7,6 +7,6 @@ export const createUser = async (
   return await user.save();
 };
 
-export const isUserExists = async (email: string): Promise<Boolean> => {
+export const isUserExists = async (email: string): Promise<boolean> => {
   return Boolean(await User.exists({ email, isDeleted: false }));
 };
