@@ -2,7 +2,6 @@ const { MongoClient } = require("mongodb");
 const { execSync } = require("child_process");
 const axios = require("axios");
 const fs = require("fs");
-const path = require("path");
 require("dotenv").config();
 
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
@@ -104,8 +103,6 @@ async function saveToMongo(feedback) {
 
 // Function to write the feedback to a JSON file in the root directory of the project
 function writeReview(response) {
-  const feedback = response.data.choices[0].message.content;
-  const created = response.data.created;
   const {
     category,
     commitHash,
@@ -114,30 +111,94 @@ function writeReview(response) {
     commitMessage,
     branchName,
   } = getCommitInfo();
+  const createdTime = new Date().getTime();
+
+  let review = commitMessage;
+  let reviewedAt = createdTime;
+  let model = "N/A";
+
+  if (response) {
+    review = response.choices[0].message.content;
+    reviewedAt = response.created;
+    model = response.model;
+  }
 
   // Prepare data to be written as JSON
   const feedbackData = {
     commitHash: commitHash,
     category: category,
-    review: feedback,
+    review,
     commitMessage,
     branchName,
     files,
     authorName,
     authorEmail,
-    created,
-    createdAt: new Date().getTime(),
+    reviewedAt,
+    createdTime,
+    isAiReviewed: response ? true : false,
+    model,
   };
 
   // Get the root directory path and append the filename
 
   try {
     saveToMongo(feedbackData);
-    console.log(`\nAI Feedback saved to DB`);
+    console.log(`\nAI Review saved to DB`);
   } catch (error) {
     console.error("Error writing to review file:", error);
   }
 }
+
+//Model used for summarization
+const models = [
+  "codellama/CodeLlama-34b-Instruct-hf",
+  "google/gemma-2-2b-it",
+  "microsoft/Phi-3-mini-4k-instruct",
+];
+
+let currentModelIndex = 0;
+
+// FUnction to Review commit using Hugging Face API
+const reviewCommit = async (fileContents) => {
+  const currentModel = models[currentModelIndex];
+  try {
+    // Send the combined content to the Hugging Face model for summarization
+    const response = await axios.post(
+      `https://api-inference.huggingface.co/models/${currentModel}/v1/chat/completions`,
+      // "https://api-inference.huggingface.co/models/google/gemma-2-2b-it/v1/chat/completions",
+      // "https://api-inference.huggingface.co/models/codellama/CodeLlama-34b-Instruct-hf/v1/chat/completions",
+      // "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct/v1/chat/completions",
+      {
+        model: currentModel,
+        // model: "google/gemma-2-2b-it",
+        // model: "codellama/CodeLlama-34b-Instruct-hf",
+        // model: "microsoft/Phi-3-mini-4k-instruct",
+        messages: [
+          {
+            role: "user",
+            content: `Summarize the file functionalities within 30 words for each file without technical explanantion and not more than 300 words collectively. here is File changes \n\n${fileContents}`,
+          },
+        ],
+        max_tokens: 250,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${HF_API_KEY}`,
+        },
+      }
+    );
+    return response;
+  } catch (error) {
+    console.error("Error reviewing commit:", error);
+    if (currentModelIndex < models.length - 1) {
+      currentModelIndex++;
+      console.log(`Reviewing with model ${models[currentModelIndex]}`);
+      return reviewCommit(fileContents);
+    }
+    return null;
+  }
+};
 
 // Function to summarize code files using Hugging Face
 async function summarizeFiles() {
@@ -148,7 +209,7 @@ async function summarizeFiles() {
     }
 
     let fileContents = "";
-    for (let file of files) {
+    for (let file of files?.filter((file) => !file.endsWith(".json"))) {
       // Read the content of each file (only if the file exists)
       if (fs.existsSync(file)) {
         const content = await readFile(file);
@@ -163,33 +224,13 @@ async function summarizeFiles() {
 
     console.log("Reviewing code changes with AI...");
 
-    // Send the combined content to the Hugging Face model for summarization
-    const response = await axios.post(
-      // "https://api-inference.huggingface.co/models/google/gemma-2-2b-it/v1/chat/completions",
-      "https://api-inference.huggingface.co/models/microsoft/Phi-3-mini-4k-instruct/v1/chat/completions",
-      {
-        // model: "google/gemma-2-2b-it",
-        model: "microsoft/Phi-3-mini-4k-instruct",
-        messages: [
-          {
-            role: "user",
-            content: `Summarize the file functionalities within 30 words for each file without technical explanantion and not more than 300 words collectively. here is File changes \n\n${fileContents}`,
-          },
-        ],
-        max_tokens: 300,
-      },
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${HF_API_KEY}`,
-        },
-      }
-    );
-    writeReview(response);
+    const review = await reviewCommit(fileContents?.substring(0, 15000));
+    writeReview(review.data);
   } catch (error) {
     console.error(
       "Error:",
-      error.response ? error.response.data : error.message
+      error.response ? error.response.data : error.message,
+      error
     );
   }
 }
