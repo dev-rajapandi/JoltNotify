@@ -37,4 +37,4 @@ jobs:
       # Step 4: Run the AI review script (branch name will be handled inside the script)
       - name: Run AI review script
         run: |
-          node ./scripts/ai-review.js
+          node .github/scripts/ai-review.js
