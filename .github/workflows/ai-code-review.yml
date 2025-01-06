@@ -25,23 +25,18 @@ jobs:
         with:
           fetch-depth: 2 # Fetch the last 2 commits
 
-      # Step 2: Set up Node.js
+      # Step 2: Set up Node.js and Hugging Face API key
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: "18" # Use the version you need
+      - name: Set up Hugging Face API key
+        run: echo "HF_API_KEY=${{ secrets.HF_API_KEY }}" >> $GITHUB_ENV
 
       # Step 3: Install dependencies (e.g., axios, dotenv)
       - name: Install dependencies
         run: |
           npm install
-
-      - name: Display git log
-        run: git log --oneline
-
-      - name: Get changed files
-        run: |
-          git diff --name-only HEAD~1 HEAD
 
       # Step 4: Run the AI review script (branch name will be handled inside the script)
       - name: Run AI review script
