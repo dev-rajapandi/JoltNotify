@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: "18" # Use the version you need
       - name: Set up Hugging Face API key
-        run: echo "HF_API_KEY=${{ secrets.HF_API_KEY }}" >> $GITHUB_ENV
+        run: echo "HUGGINGFACE_API_KEY=${{ secrets.HUGGINGFACE_API_KEY }}" >> $GITHUB_ENV
 
       # Step 3: Install dependencies (e.g., axios, dotenv)
       - name: Install dependencies
