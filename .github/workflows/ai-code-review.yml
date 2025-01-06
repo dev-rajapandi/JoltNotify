@@ -22,6 +22,8 @@ jobs:
       # Step 1: Check out the code
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2 # Fetch the last 2 commits
 
       # Step 2: Set up Node.js
       - name: Set up Node.js
@@ -33,6 +35,13 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
+
+      - name: Display git log
+        run: git log --oneline
+
+      - name: Get changed files
+        run: |
+          git diff --name-only HEAD~1 HEAD
 
       # Step 4: Run the AI review script (branch name will be handled inside the script)
       - name: Run AI review script
