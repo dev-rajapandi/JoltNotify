@@ -1,3 +1,4 @@
+const { MongoClient } = require("mongodb");
 const { execSync } = require("child_process");
 const axios = require("axios");
 const fs = require("fs");
@@ -5,20 +6,7 @@ const path = require("path");
 require("dotenv").config();
 
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
-
-// Function to get the current branch name
-function getBranchName() {
-  try {
-    const branchName = execSync("git rev-parse --abbrev-ref HEAD")
-      .toString()
-      .trim();
-    return branchName;
-  } catch (error) {
-    console.error("Error getting branch name:", error);
-    return null;
-  }
-}
-const branchName = getBranchName();
+const MONGO_URI = process.env.MONGO_URI;
 
 // Function to get the list of changed files in the latest commit
 function getChangedFiles() {
@@ -47,6 +35,7 @@ async function readFile(filePath) {
 //Function to get the commit information
 function getCommitInfo() {
   const commitInfo = {
+    branchName: "Unknown",
     commitHash: "Unknown",
     commitMessage: "Unknown",
     authorName: "Unknown",
@@ -54,6 +43,11 @@ function getCommitInfo() {
     category: "Common",
   };
   try {
+    // Get the current branch name
+    commitInfo.branchName = execSync("git rev-parse --abbrev-ref HEAD")
+      .toString()
+      .trim();
+
     // Get the latest commit hash short
     commitInfo.commitHash = execSync("git rev-parse --short HEAD")
       .toString()
@@ -88,18 +82,44 @@ function getCommitInfo() {
   }
 }
 
+async function saveToMongo(feedback) {
+  // MongoDB client setup
+  const client = new MongoClient(MONGO_URI);
+
+  try {
+    // Connect to MongoDB
+    await client.connect();
+
+    const database = client.db(); // Database name
+    const collection = database.collection("ai_review"); // Collection name
+
+    // Insert the feedback data into the collection
+    await collection.insertOne(feedback);
+  } catch (error) {
+    console.error("Error saving feedback to MongoDB:", error);
+  } finally {
+    await client.close();
+  }
+}
+
 // Function to write the feedback to a JSON file in the root directory of the project
-function writeToReviewFile(response) {
+function writeReview(response) {
   const feedback = response.data.choices[0].message.content;
   const created = response.data.created;
-  const { category, commitHash, authorEmail, authorName, commitMessage } =
-    getCommitInfo();
+  const {
+    category,
+    commitHash,
+    authorEmail,
+    authorName,
+    commitMessage,
+    branchName,
+  } = getCommitInfo();
 
   // Prepare data to be written as JSON
   const feedbackData = {
     commitHash: commitHash,
     category: category,
-    feedback: feedback,
+    review: feedback,
     commitMessage,
     branchName,
     files,
@@ -110,26 +130,10 @@ function writeToReviewFile(response) {
   };
 
   // Get the root directory path and append the filename
-  const feedbackPath = path.join(process.cwd(), "ai-review-feedback.json");
 
   try {
-    // Read existing feedback data if the file exists
-    let existingData = [];
-    if (fs.existsSync(feedbackPath)) {
-      const rawData = fs.readFileSync(feedbackPath, "utf8");
-      existingData = JSON.parse(rawData); // Parse existing file content
-    }
-
-    // Append new feedback to existing data
-    existingData.push(feedbackData);
-
-    // Write updated data back to the file, ensuring valid JSON array
-    fs.writeFileSync(
-      feedbackPath,
-      JSON.stringify(existingData, null, 2),
-      "utf8"
-    );
-    console.log(`\nAI Feedback saved to ${feedbackPath}`);
+    saveToMongo(feedbackData);
+    console.log(`\nAI Feedback saved to DB`);
   } catch (error) {
     console.error("Error writing to review file:", error);
   }
@@ -181,7 +185,7 @@ async function summarizeFiles() {
         },
       }
     );
-    writeToReviewFile(response);
+    writeReview(response);
   } catch (error) {
     console.error(
       "Error:",

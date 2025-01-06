@@ -25,13 +25,11 @@ jobs:
         with:
           fetch-depth: 2 # Fetch the last 2 commits
 
-      # Step 2: Set up Node.js and Hugging Face API key
+      # Step 2: Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: "18" # Use the version you need
-      - name: Set up Hugging Face API key
-        run: echo "HUGGINGFACE_API_KEY=${{ secrets.HUGGINGFACE_API_KEY }}" >> $GITHUB_ENV
 
       # Step 3: Install dependencies (e.g., axios, dotenv)
       - name: Install dependencies
@@ -42,3 +40,6 @@ jobs:
       - name: Run AI review script
         run: |
           node .github/scripts/ai-review.js
+        env:
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+          MONGO_URI: ${{ secrets.MONGO_URI }}
