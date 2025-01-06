@@ -5,7 +5,14 @@ on:
   push:
     branches:
       - main
+      - fe
+      - be
+      - fx-*
   pull_request:
+    branches:
+      - main # Adjust this if you want to trigger for specific branches
+      - fe
+      - be
 
 jobs:
   ai_review:
@@ -15,3 +22,19 @@ jobs:
       # Step 1: Check out the code
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Step 2: Set up Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18" # Use the version you need
+
+      # Step 3: Install dependencies (e.g., axios, dotenv)
+      - name: Install dependencies
+        run: |
+          npm install
+
+      # Step 4: Run the AI review script (branch name will be handled inside the script)
+      - name: Run AI review script
+        run: |
+          node ./scripts/ai-review.js
